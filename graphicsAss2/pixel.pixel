@@ -1,0 +1,46 @@
+#version 420
+
+in vec2 ftexcoord;
+in vec3 fnormal, flightdir;
+in vec4 fdiffusecolour, fambientcolour, fposition;
+flat in uint displace;
+
+layout (binding=0) uniform sampler2D tex1;	
+
+out vec4 outputColor;
+
+vec4 specular_colour = vec4(0.2f, 0.2f, 0.2f, 1.0);
+vec4 ambient = vec4(0.05, 0.05, 0.05, 1.0);
+float shininess = 8.0f;
+vec4 emissive = vec4(0.1f, 0.1f, 0.1f, 1.0); 
+float attenuation = 1.0f;
+
+void main()
+{
+	float fog_maxdist = 16.0;
+	float fog_mindist = 0.1;
+	vec4  fog_colour = vec4(0.0, 0.0, 0.0, 1.0);
+	vec3 L = normalize(flightdir);
+	vec3 N = normalize(fnormal);	
+	vec2 texdisp = vec2(ftexcoord.x + displace, ftexcoord.y + displace);
+
+
+	//
+	//If my displacement worked, I would import a second texture (of waves) and offset the x and y pixel sample by the value of the red and green of the displacement map.
+	//
+	vec4 normalMap = texture( tex1, texdisp );
+	N = normalize(vec3(normalMap.g, normalMap.b, normalMap.r));	
+	vec4 diffuse = max(dot(N, L), 1.0) * fdiffusecolour;
+
+	vec3 V = normalize(-fposition.xyz);	
+	vec3 R = reflect(-L, N);
+	vec4 specular = pow(max(dot(R, V), 0.0), shininess) * specular_colour;
+
+	outputColor = attenuation * (fambientcolour + diffuse + specular) + ambient;
+
+	float dist = length(fposition.xyz);
+	float fog_factor = (fog_maxdist - dist) / (fog_maxdist - fog_mindist);
+	fog_factor = clamp(fog_factor, 0.0, 1.0);
+
+	outputColor = mix(fog_colour, outputColor, fog_factor);
+}
